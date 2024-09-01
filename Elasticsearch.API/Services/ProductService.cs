@@ -1,9 +1,6 @@
-﻿using Elasticsearch.API.DTOs;
-using Elasticsearch.API.Model;
+﻿using Elastic.Clients.Elasticsearch;
+using Elasticsearch.API.DTOs;
 using Elasticsearch.API.Repositories;
-using Nest;
-using System.Collections.Immutable;
-using System.Linq;
 using System.Net;
 
 namespace Elasticsearch.API.Services;
@@ -23,6 +20,9 @@ public class ProductService
     public async Task<ResponseDto<ProductDto>> SaveAsync(ProductCreateDto request)
     {
         var responseProduct = await _repository.SaveAsync(request.CreateProduct());
+
+
+
 
         if (responseProduct == null)
         { return ResponseDto<ProductDto>.Fail(new List<string> { "Kayıt sırasında hata meydana geldi" }, HttpStatusCode.InternalServerError); }
@@ -49,7 +49,7 @@ public class ProductService
             }
             else
             {
-                productListDto.Add(new ProductDto(item.Id, item.Name, item.Price, item.Stock, new ProductFeatureDto(item.Feature.Width, item.Feature.Height, item.Feature.Color.ToString())));
+                productListDto.Add(new ProductDto(item.Id, item.Name, item.Price, item.Stock, new ProductFeatureDto(item.Feature.Width, item.Feature.Height, item.Feature.Color)));
             }
 
 
@@ -77,7 +77,7 @@ public class ProductService
 
     public async Task<ResponseDto<bool>> UpdateAsync(ProductUpdateDto productUpdateDto)
     {
-        var isSuccess=await _repository.UpdateAsync(productUpdateDto);
+        var isSuccess=await _repository.UpdateAync(productUpdateDto);
 
         if (!isSuccess) return ResponseDto<bool>.Fail("Veri güncellenemdi.", HttpStatusCode.InternalServerError);
 
@@ -101,22 +101,22 @@ public class ProductService
     {
         var deleteResponse = await _repository.HDeleteAsync(id);
 
-        
-        if (!deleteResponse.IsValid && deleteResponse.Result == Result.NotFound)
+
+        if (!deleteResponse.IsValidResponse && deleteResponse.Result == Result.NotFound)
         {
             return ResponseDto<bool>.Fail(new List<string> { "Silmeye çalıştığınız ürün bulunamamıştır." }, System.Net.HttpStatusCode.NotFound);
 
         }
 
 
-        if (!deleteResponse.IsValid)
+        if (!deleteResponse.IsValidResponse)
         {
-           
+            deleteResponse.TryGetOriginalException(out Exception? exception);
 
-            _logger.LogError(deleteResponse.OriginalException, deleteResponse.ServerError.Error.ToString());
+            _logger.LogError(exception, deleteResponse.ElasticsearchServerError.Error.ToString());
 
 
-            return ResponseDto<bool>.Fail(new List<string> { "silme esnasında bir hata meydana geldi." },HttpStatusCode.NotFound);
+            return ResponseDto<bool>.Fail(new List<string> { "silme esnasında bir hata meydana geldi." }, System.Net.HttpStatusCode.InternalServerError);
 
         }
 
@@ -124,8 +124,6 @@ public class ProductService
 
         return ResponseDto<bool>.Success(true, HttpStatusCode.NoContent);
     }
-
-
 
 
 }

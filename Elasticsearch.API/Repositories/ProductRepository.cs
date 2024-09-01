@@ -1,18 +1,18 @@
-﻿using Elasticsearch.API.DTOs;
+﻿using Elastic.Clients.Elasticsearch;
+using Elastic.Clients.Elasticsearch.QueryDsl;
+using Elasticsearch.API.DTOs;
 using Elasticsearch.API.Model;
-using Nest;
-using System.Collections.Generic;
 using System.Collections.Immutable;
 
 namespace Elasticsearch.API.Repositories
 {
     public class ProductRepository
     {
-        private readonly ElasticClient _client;
+        private readonly ElasticsearchClient _client;
 
         private const string indexName = "products";
 
-        public ProductRepository(ElasticClient client)
+        public ProductRepository(ElasticsearchClient client)
         {
             _client = client;
         }
@@ -25,7 +25,7 @@ namespace Elasticsearch.API.Repositories
 
             var response = await _client.IndexAsync(newProduct, x => x.Index(indexName).Id(Guid.NewGuid().ToString()));
 
-            if (!response.IsValid) return null;
+            if (!response.IsSuccess()) return null;
 
             newProduct.Id = response.Id;
 
@@ -37,23 +37,27 @@ namespace Elasticsearch.API.Repositories
 
         }
 
-
         public async Task<ImmutableList<Product>> GetAllAsync()
         {
-            var result = await _client.SearchAsync<Product>(s => s.Index(indexName).Query(q => q.MatchAll()));
+            // MatchAll sorgusu oluşturuluyor
+            var result = await _client.SearchAsync<Product>(s => s.Index(indexName));
 
-            foreach (var hit in result.Hits) hit.Source.Id = hit.Id;
-
+            // Döngüyle sonuçlar işleniyor
+            foreach (var hit in result.Hits)
+            {
+                hit.Source.Id = hit.Id;
+            }
 
             return result.Documents.ToImmutableList();
         }
+
 
 
         public async Task<Product> GetByIdAsync(string id)
         {
             var response=await _client.GetAsync<Product>(id,x=>x.Index(indexName));
 
-            if (!response.IsValid) return null;
+            if (!response.IsSuccess()) return null;
 
             response.Source.Id=response.Id;
 
@@ -63,18 +67,18 @@ namespace Elasticsearch.API.Repositories
 
 
 
-        public async Task<bool> UpdateAsync(ProductUpdateDto productUpdateDto)
+        public async Task<bool> UpdateAync(ProductUpdateDto updateProduct)
         {
-            var response =await _client.UpdateAsync<Product,ProductUpdateDto>(productUpdateDto.Id,x=>x.Index(indexName).Doc(productUpdateDto));
+            var response = await _client.UpdateAsync<Product, ProductUpdateDto>(indexName, updateProduct.Id, x => x.Doc(updateProduct));
 
-            return response.IsValid;
+            return response.IsSuccess();
+
         }
-
 
         public async Task<bool> DeleteAsync(string id)
         {
             var response=await _client.DeleteAsync<Product>(id, x=>x.Index(indexName));
-            return response.IsValid;
+            return response.IsSuccess();
         }
 
 

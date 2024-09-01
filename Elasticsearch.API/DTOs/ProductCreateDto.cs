@@ -16,7 +16,7 @@ public record ProductCreateDto(string Name, decimal Price, int Stock, ProductFea
             {
                 Width = ProductFeature.Width,
                 Height = ProductFeature.Height,
-                Color =(EColor)int.Parse(ProductFeature.Color),
+                Color =ProductFeature.Color
             }
         };
     }
